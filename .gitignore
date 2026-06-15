@@ -1,0 +1,25 @@
+# Data files (too large for git)
+data/*.csv
+
+# Model artifacts (too large for git, reproduce via main.py)
+models/*.joblib
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+venv/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+
+# Output
+predictions.csv
+predictions_full.csv
+
+# OS
+.DS_Store
+Thumbs.db
