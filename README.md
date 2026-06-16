@@ -34,7 +34,7 @@ Hierarchical correction using the 100 anchor samples:
 1. **Prices are remarkably stable** — majority of products have CV < 0.05, making historical mean extremely predictive
 2. **Historical features dominate** — `hist_price_mean` alone provides strong baseline
 3. **Anchor calibration has minimal impact on "normal" days** — but becomes critical during platform-wide price shifts (flash sales, promotions)
-4. **Ensemble marginally outperforms global model** for products with rich history
+4. **Tier 1 wins on MAE/MAPE; Tier 2 wins on RMSE/Median AE** — Global model has lower average error (MAE 172K vs 195K), but Ensemble is more accurate for the typical product (Median AE 2,142 vs 4,342)
 
 ## Project Structure
 
@@ -48,8 +48,8 @@ Hierarchical correction using the 100 anchor samples:
 │   ├── anchor_calibration.py   # Hierarchical anchor calibration
 │   └── evaluate.py             # Metrics & comparison
 ├── notebooks/
-│   ├── 01_eda.ipynb            # Exploratory Data Analysis (12 sections)
-│   └── anchor_simulation.py    # Anchor calibration impact simulation
+│   ├── 01_eda.ipynb            # Exploratory Data Analysis (12 sections, with output)
+│   └── 02_anchor_simulation.ipynb  # Anchor calibration impact simulation
 ├── figures/                    # Generated visualizations
 ├── models/                     # Saved model artifacts (.gitkeep)
 ├── data/                       # CSV files (not committed)
@@ -59,6 +59,7 @@ Hierarchical correction using the 100 anchor samples:
 ├── pyproject.toml              # uv project config & pinned dependencies
 ├── .python-version             # Python 3.11 (required for wheel availability)
 ├── requirements.txt            # Pinned dependencies (pip fallback)
+├── RESULTS.md                  # Full evaluation — metrics, analysis, methodology
 └── README.md
 ```
 
@@ -67,7 +68,7 @@ Hierarchical correction using the 100 anchor samples:
 ### With uv (recommended)
 
 ```bash
-git clone https://github.com/<your-username>/mrscraper-price-intelligence.git
+git clone https://github.com/Indrapuma/mr-scraper-price-intelligence.git
 cd mrscraper-price-intelligence
 
 # Install uv if not already installed
