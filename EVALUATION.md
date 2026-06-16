@@ -66,9 +66,62 @@ The system is structured so that when price shifts *do* occur, the hierarchical 
 - **Fine-tuning on anchors** — not pursued (100 samples too few to retrain without overfitting)
 - **Global bias correction (additive vs multiplicative)** — tested both; multiplicative performs better for proportional price shifts
 
+### Anchor Calibration on Anomalous Days (Simulation)
+
+To demonstrate the value of anchor calibration when price shifts *do* occur, I simulated an anomalous day by artificially shifting validation prices by 15% (simulating a platform-wide flash sale):
+
+| Scenario | Without Calibration | With Calibration | Improvement |
+|----------|--------------------|--------------------|-------------|
+| Normal day (no shift) | MAPE 0.85% | MAPE 0.85% | ~0% (no harm) |
+| 15% price drop (flash sale) | MAPE 18.27% | MAPE 0.85% | **95.4% error reduction** |
+| 10% price increase | MAPE 9.76% | MAPE 0.85% | **91.3% error reduction** |
+| Category-specific promo (-20%) | MAPE 5.84% | MAPE 5.84% | ~0% (needs more anchor coverage) |
+
+**Conclusion**: On normal days, calibration is neutral (no harm). On platform-wide shifts, it reduces error by **91-95%** — bringing MAPE from double digits back to sub-1%. For category-specific promos, the hierarchical approach needs sufficient anchor coverage in that category to be effective — a limitation worth noting.
+
+See `notebooks/anchor_simulation.py` for the full simulation code.
+
 ---
 
-## 3. Feature Engineering
+## 3. Data Preprocessing & Feature Engineering
+
+### Preprocessing Pipeline
+
+#### Data Loading
+- **Parse dates**: `capturedAt` string → datetime object
+- **Boolean conversion**: `t/f` strings → `True/False` for 5 boolean columns (`is_free_shipping`, `is_pre_order`, `is_official_shop`, `is_verified`, `is_preferred_plus_seller`)
+- **Dtype handling**: All numeric columns loaded as `float64` to safely handle NaN values in some rows
+
+#### Missing Value Handling
+- **No manual imputation** — LightGBM handles NaN natively via NaN-aware splits (routes missing values to optimal child node during tree construction)
+- `hist_price_std` NaN (products with single observation) → filled with 0 (no variance)
+- Feature matrix passed with `fillna(-1)` as safety fallback before prediction
+
+#### Feature Transforms Applied
+| Transform | Columns | Reason |
+|-----------|---------|--------|
+| `log1p()` | `shop_follower_count`, `total_rating_count`, `cmt_count`, `stock` | Highly skewed distributions → compress range |
+| Boolean → int | All 5 boolean columns | Required for numeric feature matrix |
+| Date → ordinal | `capturedAt` → `date_ordinal` | Captures long-term price trend as numeric |
+| Datetime extraction | `capturedAt` → 7 temporal features | Day-of-week, month, hour, etc. |
+
+#### What was NOT done (and why)
+| Technique | Reason not applied |
+|-----------|-------------------|
+| Normalization / Scaling | Tree-based models are split-based, not distance-based — scaling has zero effect |
+| One-hot encoding | LightGBM handles high-cardinality numeric IDs natively via splits |
+| Label encoding for `brand` | Too many unique values; information already captured through shop/category features |
+| Outlier removal | LightGBM is robust to outliers; removing them risks losing legitimate flash-sale patterns |
+| Target transform (log price) | Not needed — model achieves R² = 0.9991 on raw prices |
+| Winsorization | Could mask real price extremes that the model should learn |
+
+#### Design Philosophy
+Preprocessing is kept **minimal and intentional** because:
+1. LightGBM handles NaN, outliers, and mixed scales natively
+2. Heavy preprocessing can introduce information loss
+3. Energy is better spent on **feature engineering** (56 derived features) than cleaning already-clean data
+
+---
 
 ### 56 Total Features across 8 categories:
 
@@ -188,11 +241,38 @@ Weighting adapts based on per-product data availability:
 - **Handling**: LightGBM is inherently robust to outliers (splits don't depend on magnitude)
 - **Evaluation**: Using Median AE alongside MAE to assess impact of outliers
 - **Price bounds**: Predictions clipped to `max(prediction, 0)` — no negative prices
+- **Documentation**: Outliers in this dataset are primarily flash-sale prices and data entry errors. Rather than removing them, the model learns to associate them with contextual signals (`has_promotion`, `show_discount`, low `stock_ratio`). This is intentional — in production, we *want* the model to predict flash-sale prices when the context indicates one is active.
 
 ### Treatment of Missing Values
 - **Numeric NaN**: Passed directly to LightGBM (handles natively via NaN-aware splits)
 - **Feature fallback**: When `hist_price_mean` is NaN (new product), model relies on `item_price_min/max` and category averages
 - **Boolean columns**: Explicit True/False mapping from `t/f` strings
+
+### Cold Start Handling
+Products or shops with very few historical observations (< 5 rows in training) present a cold-start challenge for Tier 2. The system handles this via **hierarchical fallback**:
+
+1. **Product-level model** requires ≥ 2 historical observations. Products with 0-1 observations get no product-level prediction (NaN).
+2. **Ensemble weighting** adapts: sparse-history products receive higher weight on global + shop models (global 35%, shop 40%, product 25%).
+3. **If no product model exists at all** (1.1% of test targets): prediction = 55% shop-level + 45% global — skipping product entirely.
+4. **Category/shop historical features** (e.g., `cat_avg_price`, `shop_avg_price`) still provide useful signals even for cold-start items.
+
+**Result**: 98.9% of test products have sufficient history for product-level models. The remaining 1.1% are handled gracefully by the fallback mechanism.
+
+### Data Leakage Prevention
+The `capturedAt` column is available in both training and test data. Key leakage considerations:
+
+1. **`date_ordinal`** — Derived from `capturedAt`. This is NOT leakage because:
+   - The test set provides `capturedAt` for all rows (including targets)
+   - It captures long-term price trends (inflation/deflation over weeks)
+   - The model doesn't learn "on March 22 prices are X" — it learns "as time passes, prices drift by Y per day"
+
+2. **Temporal features** (`day_of_week`, `hour`, etc.) — Also NOT leakage because:
+   - These capture cyclical patterns (weekend pricing, time-of-day effects)
+   - The test set explicitly provides these timestamps
+
+3. **What WOULD be leakage**: Using future prices from the training set to predict past dates. Our time-based validation split prevents this — training only uses data *before* the validation period.
+
+4. **Anchor set isolation**: During validation, anchors are randomly sampled but never used as training features — only for post-prediction calibration.
 
 ---
 
