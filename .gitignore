@@ -1,8 +1,7 @@
 # Data files (too large for git)
 data/*.csv
 
-# Model artifacts (too large for git, reproduce via main.py)
-models/*.joblib
+# Model artifacts committed directly (see models/)
 
 # Python
 __pycache__/
