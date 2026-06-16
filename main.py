@@ -22,7 +22,7 @@ warnings.filterwarnings("ignore")
 # Add project root to path
 sys.path.insert(0, os.path.dirname(__file__))
 
-from src.data_loader import load_data, split_test_anchors, download_data
+from src.data_loader import load_data, split_test_anchors, download_data, filter_invalid_rows
 from src.feature_engineering import build_features, get_feature_columns
 from src.model_global import (
     train_global_model, predict_global,
@@ -70,6 +70,11 @@ def main():
         download_data()
 
     train_df, test_df = load_data(train_path, test_path)
+
+    # Data quality filter — remove logically impossible rows
+    print("\nApplying data quality filters...")
+    train_df = filter_invalid_rows(train_df, is_train=True)
+    test_df = filter_invalid_rows(test_df, is_train=False)
 
     # Split test into anchors and targets
     anchors_df, targets_df = split_test_anchors(test_df)

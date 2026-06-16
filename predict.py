@@ -18,7 +18,7 @@ warnings.filterwarnings("ignore")
 
 sys.path.insert(0, os.path.dirname(__file__))
 
-from src.data_loader import load_data, split_test_anchors
+from src.data_loader import load_data, split_test_anchors, filter_invalid_rows
 from src.feature_engineering import build_features, get_feature_columns
 from src.model_global import predict_global
 from src.model_shop import (
@@ -94,6 +94,11 @@ def predict(test_file: str, output_file: str, train_file: str = None):
         for df in [train_df, test_df]:
             if col in df.columns:
                 df[col] = df[col].map({"t": True, "f": False}).astype(bool)
+
+    # Data quality filter
+    print("\nApplying data quality filters...")
+    train_df = filter_invalid_rows(train_df, is_train=True)
+    test_df = filter_invalid_rows(test_df, is_train=False)
 
     # Split test into anchors and targets
     anchors_df = test_df[test_df["price"].notna()].copy()

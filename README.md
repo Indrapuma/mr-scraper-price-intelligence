@@ -1,4 +1,4 @@
-# Price Intelligence & Anomaly Detection
+# Price Intelligence
 
 **MrScraper AI Engineer — Take Home Test**
 
@@ -41,36 +41,57 @@ Hierarchical correction using the 100 anchor samples:
 ```
 ├── src/
 │   ├── __init__.py
-│   ├── data_loader.py          # Data download & loading
+│   ├── data_loader.py          # Data download, loading & quality filtering
 │   ├── feature_engineering.py  # 56 engineered features
 │   ├── model_global.py         # Tier 1: Global Marketplace Model
 │   ├── model_shop.py           # Tier 2: Shop/Product Level Model
 │   ├── anchor_calibration.py   # Hierarchical anchor calibration
 │   └── evaluate.py             # Metrics & comparison
 ├── notebooks/
-│   └── eda.py                  # Exploratory Data Analysis
+│   ├── 01_eda.ipynb            # Exploratory Data Analysis (12 sections)
+│   └── anchor_simulation.py    # Anchor calibration impact simulation
 ├── figures/                    # Generated visualizations
 ├── models/                     # Saved model artifacts (.gitkeep)
 ├── data/                       # CSV files (not committed)
 ├── main.py                     # Full pipeline: train + validate + predict
 ├── predict.py                  # Inference-only script (for interview)
 ├── visualize.py                # Generate all result visualizations
-├── requirements.txt            # Pinned dependencies
+├── pyproject.toml              # uv project config & pinned dependencies
+├── .python-version             # Python 3.11 (required for wheel availability)
+├── requirements.txt            # Pinned dependencies (pip fallback)
 └── README.md
 ```
 
 ## Setup & Installation
 
+### With uv (recommended)
+
 ```bash
 git clone https://github.com/<your-username>/mrscraper-price-intelligence.git
 cd mrscraper-price-intelligence
 
-# Create virtual environment
+# Install uv if not already installed
+# https://docs.astral.sh/uv/getting-started/installation/
+
+uv sync          # Creates .venv with Python 3.11 + all dependencies
+```
+
+Activate the environment:
+```bash
+# Windows
+.venv\Scripts\activate
+
+# Linux/Mac
+source .venv/bin/activate
+```
+
+### With pip (fallback)
+
+```bash
 python -m venv venv
 source venv/bin/activate  # Linux/Mac
 venv\Scripts\activate     # Windows
 
-# Install dependencies
 pip install -r requirements.txt
 ```
 
@@ -110,7 +131,7 @@ Outputs 8 plots to `figures/`.
 ## Reproducing Results
 
 - **Random seed**: 42
-- **Python**: 3.10+
+- **Python**: 3.11 (pinned via `.python-version` for wheel compatibility)
 - **Validation**: Time-based split (last 3 days of training data)
 - **Anchor simulation**: 100 random samples per validation day
 

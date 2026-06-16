@@ -102,6 +102,76 @@ def load_data(train_path=None, test_path=None):
     return train_df, test_df
 
 
+def filter_invalid_rows(df: pd.DataFrame, is_train: bool = True) -> pd.DataFrame:
+    """
+    Remove rows that are logically impossible regardless of business context.
+
+    These are not outlier judgement calls — they are data quality violations
+    that cannot represent real e-commerce observations:
+      - price <= 0          (a sold item must have a positive price)
+      - show_discount > 100 (percentage cannot exceed 100)
+      - show_discount < 0   (percentage cannot be negative)
+      - stock < 0           (inventory cannot be negative)
+      - normal_stock < 0    (inventory cannot be negative)
+      - review_rating > 5   (platform uses 0–5 scale)
+      - review_rating < 0
+      - shop_rating > 5
+      - shop_rating < 0
+      - shop_response_rate > 100
+      - shop_response_rate < 0
+
+    For test data, price filtering is skipped because target rows have NaN price
+    by design — only anchor rows (price filled) are checked.
+
+    Args:
+        df: DataFrame to filter
+        is_train: If True, price <= 0 rows are dropped.
+                  If False, only rows with a known price that is <= 0 are dropped.
+
+    Returns:
+        Filtered DataFrame with a reset index.
+    """
+    original_len = len(df)
+    mask_valid = pd.Series(True, index=df.index)
+
+    # Price must be positive where known
+    if "price" in df.columns:
+        has_price = df["price"].notna()
+        mask_valid &= ~(has_price & (df["price"] <= 0))
+
+    # Discount percentage: 0–100
+    if "show_discount" in df.columns:
+        mask_valid &= ~(df["show_discount"].notna() & (df["show_discount"] < 0))
+        mask_valid &= ~(df["show_discount"].notna() & (df["show_discount"] > 100))
+
+    # Stock cannot be negative
+    for col in ["stock", "normal_stock"]:
+        if col in df.columns:
+            mask_valid &= ~(df[col].notna() & (df[col] < 0))
+
+    # Ratings are on a 0–5 scale
+    for col in ["review_rating", "shop_rating"]:
+        if col in df.columns:
+            mask_valid &= ~(df[col].notna() & (df[col] < 0))
+            mask_valid &= ~(df[col].notna() & (df[col] > 5))
+
+    # Response rate is a percentage: 0–100
+    if "shop_response_rate" in df.columns:
+        mask_valid &= ~(df["shop_response_rate"].notna() & (df["shop_response_rate"] < 0))
+        mask_valid &= ~(df["shop_response_rate"].notna() & (df["shop_response_rate"] > 100))
+
+    filtered_df = df[mask_valid].reset_index(drop=True)
+    n_removed = original_len - len(filtered_df)
+
+    if n_removed > 0:
+        print(f"  Data quality filter: removed {n_removed} invalid rows "
+              f"({n_removed / original_len * 100:.2f}% of {original_len:,})")
+    else:
+        print(f"  Data quality filter: no invalid rows found ({original_len:,} rows clean)")
+
+    return filtered_df
+
+
 def split_test_anchors(test_df):
     """
     Split test data into anchor samples (price filled) and prediction targets (price blank).
