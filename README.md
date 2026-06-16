@@ -51,7 +51,7 @@ Hierarchical correction using the 100 anchor samples:
 │   ├── 01_eda.ipynb            # Exploratory Data Analysis (12 sections, with output)
 │   └── 02_anchor_simulation.ipynb  # Anchor calibration impact simulation
 ├── figures/                    # Generated visualizations
-├── models/                     # Saved model artifacts (.gitkeep)
+├── models/                     # Trained model artifacts (committed)
 ├── data/                       # CSV files (not committed)
 ├── main.py                     # Full pipeline: train + validate + predict
 ├── predict.py                  # Inference-only script (for interview)
@@ -121,7 +121,7 @@ This runs:
 ```bash
 python predict.py --test_file data/test_full.csv --output predictions_full.csv
 ```
-Uses pre-trained models from `models/` to predict on new test data.
+Pre-trained models are committed in `models/` — no retraining needed. Runs in under 5 minutes.
 
 ### 4. Generate Visualizations
 ```bash
@@ -136,7 +136,7 @@ Outputs 8 plots to `figures/`.
 - **Validation**: Time-based split (last 3 days of training data)
 - **Anchor simulation**: 100 random samples per validation day
 
-Models are saved to `models/` after running `main.py`. To reproduce from scratch, delete `models/` and re-run `main.py`.
+Pre-trained models are committed in `models/` and can be used directly with `predict.py`. To reproduce from scratch, delete `models/` and re-run `main.py`.
 
 ## Validation Methodology
 
